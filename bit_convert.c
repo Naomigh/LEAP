@@ -5,10 +5,10 @@
  *      Author: hxin
  */
 
+#include <x86intrin.h>
 #include "print.h"
 #include "bit_convert.h"
 #include <stdio.h>
-#include <x86intrin.h>
 
 #ifndef __clang__
 // This is here only because gcc lacks some intrinsics!!
@@ -479,3 +479,23 @@ void avx_convert2bit(char *str, uint8_t *bits0, uint8_t *bits1) {
 	}
 }
 
+#ifdef USE_AVX512
+void avx512_convert2bit(char *str, uint8_t *bits0, uint8_t *bits1) {
+	uint64_t *bit0_words = (uint64_t*) bits0;
+	uint64_t *bit1_words = (uint64_t*) bits1;
+
+	__m512i maskC = _mm512_set1_epi8('C');
+	__m512i maskG = _mm512_set1_epi8('G');
+	__m512i maskT = _mm512_set1_epi8('T');
+
+	for (int i = 0; i < 8; i++) {
+		__m512i bases = _mm512_loadu_si512((__m512i const*) (str + i * 64));
+		__mmask64 c = _mm512_cmpeq_epi8_mask(maskC, bases);
+		__mmask64 g = _mm512_cmpeq_epi8_mask(maskG, bases);
+		__mmask64 t = _mm512_cmpeq_epi8_mask(maskT, bases);
+
+		bit0_words[i] = (uint64_t)(c | t);
+		bit1_words[i] = (uint64_t)(g | t);
+	}
+}
+#endif

@@ -23,7 +23,11 @@
 
 #define BATCH_RUN 1000000 
 #ifndef _MAX_LENGTH_ 
+#ifdef USE_AVX512
+#define _MAX_LENGTH_ 512
+#else
 #define _MAX_LENGTH_ 256
+#endif
 #endif
 
 using namespace std;

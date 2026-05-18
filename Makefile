@@ -21,6 +21,7 @@ CFLAGS = -O3 --std=c++11 -mbmi -mavx2 -msse4.2 -I . \
          -I $(STRING_BUF_PATH) -I $(BIOINF_LIB_PATH) -I $(SCORING_PATH) \
          -I $(NW_PATH) -DCOMPILE_TIME='"$(shell date)"' -DSCORE_TYPE='int' \
          -fpermissive
+AVX512_FLAGS = $(CFLAGS) -DUSE_AVX512 -mavx512f -mavx512bw -mavx512vl
 UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Linux)
 endif
@@ -83,6 +84,27 @@ needleman_wunsch.o: $(NW_PATH)/needleman_wunsch.c $(NW_PATH)/needleman_wunsch.h
 vectorED: SIMD_ED.o print.o bit_convert.o vectorED.cc shift.o SHD.o mask.o popcount.o needleman_wunsch.o $(wildcard $(SCORING_PATH)/*.c) $(UTILITY_LIB_PATH)/utility_lib.c $(BIOINF_LIB_PATH)/bioinf.c $(STRING_BUF_PATH)/string_buffer.c $(NW_PATH)/nw_cmdline.c 
 	$(CXX) $(CFLAGS) $^ -o $@ -lz 
 
+SIMD_ED_avx512.o: SIMD_ED.cc SIMD_ED.h
+	$(CXX) $(AVX512_FLAGS) -c $< -o $@
+
+bit_convert_avx512.o: bit_convert.c bit_convert.h
+	$(CXX) $(AVX512_FLAGS) -c $< -o $@
+
+shift_avx512.o: shift.c shift.h
+	$(CXX) $(AVX512_FLAGS) -c $< -o $@
+
+SHD_avx512.o: SHD.cc SHD.h
+	$(CXX) $(AVX512_FLAGS) -c $< -o $@
+
+mask_avx512.o: mask.c mask.h
+	$(CXX) $(AVX512_FLAGS) -c $< -o $@
+
+popcount_avx512.o: popcount.c popcount.h
+	$(CXX) $(AVX512_FLAGS) -c $< -o $@
+
+vectorED_avx512: SIMD_ED_avx512.o print.o bit_convert_avx512.o vectorED.cc shift_avx512.o SHD_avx512.o mask_avx512.o popcount_avx512.o needleman_wunsch.o $(wildcard $(SCORING_PATH)/*.c) $(UTILITY_LIB_PATH)/utility_lib.c $(BIOINF_LIB_PATH)/bioinf.c $(STRING_BUF_PATH)/string_buffer.c $(NW_PATH)/nw_cmdline.c
+	$(CXX) $(AVX512_FLAGS) $^ -o $@ -lz
+
 testNW: SIMD_ED.o print.o bit_convert.o testNW.cc shift.o SHD.o mask.o popcount.o needleman_wunsch.o $(wildcard $(SCORING_PATH)/*.c) $(UTILITY_LIB_PATH)/utility_lib.c $(BIOINF_LIB_PATH)/bioinf.c $(STRING_BUF_PATH)/string_buffer.c $(NW_PATH)/nw_cmdline.c 
 	$(CXX) $(CFLAGS) $^ -o $@ -L/usr/local/lib -lz -lparasail
 
@@ -94,6 +116,9 @@ testLV_BAG: LV_BAG.o testLV_BAG.cc
 
 vectorSHD_ED: SIMD_ED.o SHD.o mask.o print.o bit_convert.o shift.o popcount.o vectorSHD_ED.cc
 	$(CXX) $(CFLAGS) $^ -o $@
+
+vectorSHD_ED_avx512: SIMD_ED_avx512.o SHD_avx512.o mask_avx512.o print.o bit_convert_avx512.o shift_avx512.o popcount_avx512.o vectorSHD_ED.cc
+	$(CXX) $(AVX512_FLAGS) $^ -o $@
 
 test_SIMD_ED: SIMD_ED.o vector_filter.o bit_convert.o mask.o popcount.o print.o test_ED.cc
 	$(CXX) $(CFLAGS) $^ -o $@
