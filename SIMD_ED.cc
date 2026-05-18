@@ -97,35 +97,43 @@ int SIMD_ED::count_ID_length_avx(int lane_idx, int start_pos) {
 
 #ifdef USE_AVX512
 int SIMD_ED::count_ID_length_avx512(int lane_idx, int start_pos) {
-	__m512i shifted_mask = shift_left_avx512(hamming_masks[lane_idx], start_pos);
-	uint64_t byte_cast [LEAP_AVX512_EFFECTIVE_LENGTH / 64] __aligned__;
-	_mm512_storeu_si512((__m512i*) byte_cast, shifted_mask);
-
-	int length_result = 0;
-	int words = (buffer_length - start_pos + 63) / 64;
-	if (words > LEAP_AVX512_EFFECTIVE_LENGTH / 64)
-		words = LEAP_AVX512_EFFECTIVE_LENGTH / 64;
-
-	for (int i = 0; i < words; i++) {
-#ifdef NO_BIT_VEC
-		int id_length = 0;
-		while ((id_length < 64) && ((byte_cast[i] & ((uint64_t)1 << id_length)) == 0))
-			id_length++;
-#else
-		int id_length = _tzcnt_u64(byte_cast[i]);
+    __m512i shifted_mask = shift_left_avx512(hamming_masks[lane_idx], start_pos);
+#ifdef debug
+    cout << "start_pos: " << start_pos << " ";
+    print512_bit(shifted_mask);
 #endif
-		if (id_length == 64 && byte_cast[i] == 0)
-			length_result += 64;
-		else {
-			length_result += id_length;
-			break;
-		}
-	}
 
-	if (length_result < buffer_length - start_pos)
-		return length_result;
-	else
-		return buffer_length - start_pos;
+    uint64_t byte_cast[_MAX_LENGTH_ / 64] __aligned__;
+    _mm512_storeu_si512((__m512i*) byte_cast, shifted_mask);
+
+    int length_result = 0;
+    for (int i = 0; i <= (buffer_length - start_pos - 1) / (8 * sizeof(uint64_t)); i++) {
+#ifdef NO_BIT_VEC
+        int id_length = 0;
+        while ((id_length < 8 * sizeof(uint64_t)) &&
+               ((byte_cast[i] & ((uint64_t)1 << id_length)) == 0))
+            id_length++;
+#else
+        int id_length = _tzcnt_u64(byte_cast[i]);
+#endif
+
+        if (id_length == 8 * sizeof(uint64_t) && byte_cast[i] == 0) {
+            id_length = 8 * sizeof(uint64_t);
+            length_result += id_length;
+        } else {
+            length_result += id_length;
+            break;
+        }
+    }
+
+#ifdef debug
+    cout << "length result: " << length_result << endl;
+#endif
+
+    if (length_result < buffer_length - start_pos)
+        return length_result;
+    else
+        return buffer_length - start_pos;
 }
 #endif
 
