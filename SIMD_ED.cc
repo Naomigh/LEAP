@@ -3,10 +3,10 @@
 #include "SHD.h"
 #include <cassert>
 
-#ifdef USE_AVX512
-static void* leap_aligned_malloc(size_t bytes) {
+#if defined(USE_AVX512) || defined(__AVX2__)
+static void* leap_aligned_malloc(size_t bytes, size_t alignment) {
 	void *ptr = NULL;
-	if (posix_memalign(&ptr, 64, bytes) != 0)
+	if (posix_memalign(&ptr, alignment, bytes) != 0)
 		return NULL;
 	return ptr;
 }
@@ -14,12 +14,25 @@ static void* leap_aligned_malloc(size_t bytes) {
 static void leap_aligned_free(void *ptr) {
 	free(ptr);
 }
+#endif
 
+#ifdef USE_AVX512
 static __m512i* alloc_hamming_masks_avx512(int total_lanes) {
 	size_t bytes = sizeof(__m512i) * total_lanes;
-	__m512i *ptr = (__m512i*)leap_aligned_malloc(bytes);
+	__m512i *ptr = (__m512i*)leap_aligned_malloc(bytes, 64);
 	if (ptr == NULL) {
 		fprintf(stderr, "Failed to allocate aligned AVX512 hamming_masks\n");
+		abort();
+	}
+	memset(ptr, 0, bytes);
+	return ptr;
+}
+#elif defined(__AVX2__)
+static __m256i* alloc_hamming_masks_avx2(int total_lanes) {
+	size_t bytes = sizeof(__m256i) * total_lanes;
+	__m256i *ptr = (__m256i*)leap_aligned_malloc(bytes, 32);
+	if (ptr == NULL) {
+		fprintf(stderr, "Failed to allocate aligned AVX2 hamming_masks\n");
 		abort();
 	}
 	memset(ptr, 0, bytes);
@@ -150,6 +163,8 @@ SIMD_ED::~SIMD_ED() {
 			delete [] cur_ED;
 
 #ifdef USE_AVX512
+		leap_aligned_free(hamming_masks);
+#elif defined(__AVX2__)
 		leap_aligned_free(hamming_masks);
 #else
 		delete [] hamming_masks;
@@ -365,6 +380,8 @@ void SIMD_ED::init_levenshtein(int ED_threshold, ED_modes mode, bool SHD_enable)
 
 #ifdef USE_AVX512
 	hamming_masks = alloc_hamming_masks_avx512(total_lanes);
+#elif defined(__AVX2__)
+	hamming_masks = alloc_hamming_masks_avx2(total_lanes);
 #else
 	hamming_masks = new __m256i [total_lanes];
 #endif
@@ -624,6 +641,8 @@ void SIMD_ED::init_affine(int gap_threshold, int af_threshold, ED_modes mode, in
 	mid_lane = gap_threshold + 1;
 #ifdef USE_AVX512
 	hamming_masks = alloc_hamming_masks_avx512(total_lanes);
+#elif defined(__AVX2__)
+	hamming_masks = alloc_hamming_masks_avx2(total_lanes);
 #else
 	hamming_masks = new __m256i [total_lanes];
 #endif
