@@ -19,7 +19,9 @@
 #include "string_buffer.h" 
 #include "needleman_wunsch.h" 
 #include "nw_cmdline.h" 
-#include "parasail.h" 
+#ifdef USE_PARASAIL
+#include "parasail.h"
+#endif
 
 #define BATCH_RUN 1000000 
 #ifndef _MAX_LENGTH_ 

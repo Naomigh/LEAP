@@ -120,6 +120,38 @@ vectorSHD_ED: SIMD_ED.o SHD.o mask.o print.o bit_convert.o shift.o popcount.o ve
 vectorSHD_ED_avx512: SIMD_ED_avx512.o SHD_avx512.o mask_avx512.o print.o bit_convert_avx512.o shift_avx512.o popcount_avx512.o vectorSHD_ED.cc
 	$(CXX) $(AVX512_FLAGS) $^ -o $@
 
+tests/test_avx512_bit_convert: tests/test_avx512_bit_convert.cpp bit_convert_avx512.o
+	$(CXX) $(AVX512_FLAGS) $^ -o $@
+
+tests/test_avx512_shift: tests/test_avx512_shift.cpp shift_avx512.o
+	$(CXX) $(AVX512_FLAGS) $^ -o $@
+
+tests/test_avx512_lane_masks: tests/test_avx512_lane_masks.cpp SIMD_ED_avx512.o SHD_avx512.o mask_avx512.o print.o bit_convert_avx512.o shift_avx512.o popcount_avx512.o
+	$(CXX) $(AVX512_FLAGS) $^ -o $@
+
+tests/test_avx512_vth: tests/test_avx512_vth.cpp SIMD_ED_avx512.o SHD_avx512.o mask_avx512.o print.o bit_convert_avx512.o shift_avx512.o popcount_avx512.o
+	$(CXX) $(AVX512_FLAGS) $^ -o $@
+
+tests/test_avx512_full_correctness: tests/test_avx512_full_correctness.cpp SIMD_ED_avx512.o SHD_avx512.o mask_avx512.o print.o bit_convert_avx512.o shift_avx512.o popcount_avx512.o
+	$(CXX) $(AVX512_FLAGS) $^ -o $@
+
+test_avx512_bit_convert: tests/test_avx512_bit_convert
+	./tests/test_avx512_bit_convert
+
+test_avx512_shift: tests/test_avx512_shift
+	./tests/test_avx512_shift
+
+test_avx512_lane_masks: tests/test_avx512_lane_masks
+	./tests/test_avx512_lane_masks
+
+test_avx512_vth: tests/test_avx512_vth
+	./tests/test_avx512_vth
+
+test_avx512_full_correctness: tests/test_avx512_full_correctness
+	./tests/test_avx512_full_correctness
+
+test_avx512_correctness: test_avx512_bit_convert test_avx512_shift test_avx512_lane_masks test_avx512_vth test_avx512_full_correctness
+
 test_SIMD_ED: SIMD_ED.o vector_filter.o bit_convert.o mask.o popcount.o print.o test_ED.cc
 	$(CXX) $(CFLAGS) $^ -o $@
 		
@@ -137,7 +169,7 @@ testRefDB: RefDB.o bit_convert.o shift.o print.o RefDBMain.cc
 	
 
 	
-.PHONY : clean
+.PHONY : clean test_avx512_bit_convert test_avx512_shift test_avx512_lane_masks test_avx512_vth test_avx512_full_correctness test_avx512_correctness
 
 clean:
-	rm -f $(EXECUTABLE) *.o
+	rm -f $(EXECUTABLE) *.o tests/test_avx512_bit_convert tests/test_avx512_shift tests/test_avx512_lane_masks tests/test_avx512_vth tests/test_avx512_full_correctness vectorED_avx512 vectorSHD_ED_avx512

@@ -3,6 +3,30 @@
 #include "SHD.h"
 #include <cassert>
 
+#ifdef USE_AVX512
+static void* leap_aligned_malloc(size_t bytes) {
+	void *ptr = NULL;
+	if (posix_memalign(&ptr, 64, bytes) != 0)
+		return NULL;
+	return ptr;
+}
+
+static void leap_aligned_free(void *ptr) {
+	free(ptr);
+}
+
+static __m512i* alloc_hamming_masks_avx512(int total_lanes) {
+	size_t bytes = sizeof(__m512i) * total_lanes;
+	__m512i *ptr = (__m512i*)leap_aligned_malloc(bytes);
+	if (ptr == NULL) {
+		fprintf(stderr, "Failed to allocate aligned AVX512 hamming_masks\n");
+		abort();
+	}
+	memset(ptr, 0, bytes);
+	return ptr;
+}
+#endif
+
 #ifndef USE_AVX512
 int SIMD_ED::count_ID_length_avx(int lane_idx, int start_pos) {
 	__m256i shifted_mask = shift_left_avx(hamming_masks[lane_idx], start_pos);
@@ -125,7 +149,11 @@ SIMD_ED::~SIMD_ED() {
 		else
 			delete [] cur_ED;
 
+#ifdef USE_AVX512
+		leap_aligned_free(hamming_masks);
+#else
 		delete [] hamming_masks;
+#endif
 
 		for (int i = 0; i < total_lanes; i++) {
 			delete [] start[i];
@@ -335,13 +363,11 @@ void SIMD_ED::init_levenshtein(int ED_threshold, ED_modes mode, bool SHD_enable)
 	total_lanes = 2 * ED_t + 3;
 	mid_lane = ED_t + 1;
 
-	hamming_masks = new
 #ifdef USE_AVX512
-		__m512i
+	hamming_masks = alloc_hamming_masks_avx512(total_lanes);
 #else
-		__m256i
+	hamming_masks = new __m256i [total_lanes];
 #endif
-		[total_lanes];
 
 	cur_ED = new int[total_lanes];
 	ED_info = new ED_INFO[ED_t + 1];
@@ -372,6 +398,9 @@ void SIMD_ED::init_levenshtein(int ED_threshold, ED_modes mode, bool SHD_enable)
 
 void SIMD_ED::reset_levenshtein() {
 	ED_pass = false;
+	final_ED = ED_t + 1;
+	final_lane_idx = mid_lane;
+	converge_ED = ED_t + 1;
 	for (int i = 1; i < total_lanes - 1; i++) {
 		if (mode == ED_GLOBAL || mode == ED_SEMI_FREE_END) {
 			int ED = abs(i - mid_lane);
@@ -414,8 +443,14 @@ void SIMD_ED::run_levenshtein() {
 			if (end[l][0] == buffer_length) {
 				final_lane_idx = l;
 				final_ED = 0;
-				ED_pass = true;
-				return;
+				if (mode == ED_GLOBAL || mode == ED_SEMI_FREE_BEGIN) {
+					converge_ED = final_ED + abs(final_lane_idx - mid_lane);
+					ED_pass = converge_ED <= ED_t;
+				}
+				else
+					ED_pass = true;
+				if (ED_pass)
+					return;
 			}
 			
 			cur_ED[l]++;
@@ -464,9 +499,15 @@ void SIMD_ED::run_levenshtein() {
 				if (end[l][e] == buffer_length) {
 					final_lane_idx = l;
 					final_ED = e;
-					ED_pass = true;
+					if (mode == ED_GLOBAL || mode == ED_SEMI_FREE_BEGIN) {
+						converge_ED = final_ED + abs(final_lane_idx - mid_lane);
+						ED_pass = converge_ED <= ED_t;
+					}
+					else
+						ED_pass = true;
 					
-					break;
+					if (ED_pass)
+						break;
 				}
 
 				cur_ED[l]++;
@@ -477,7 +518,7 @@ void SIMD_ED::run_levenshtein() {
 			break;
 	}
 
-	if (mode == ED_GLOBAL || mode == ED_SEMI_FREE_BEGIN) {
+	if (ED_pass && (mode == ED_GLOBAL || mode == ED_SEMI_FREE_BEGIN)) {
 		converge_ED = final_ED + abs(final_lane_idx - mid_lane);
 		ED_pass = converge_ED <= ED_t;
 	}
@@ -581,13 +622,11 @@ void SIMD_ED::init_affine(int gap_threshold, int af_threshold, ED_modes mode, in
  
  	total_lanes = 2 * gap_threshold + 3;
 	mid_lane = gap_threshold + 1;
-	hamming_masks = new
 #ifdef USE_AVX512
-		__m512i
+	hamming_masks = alloc_hamming_masks_avx512(total_lanes);
 #else
-		__m256i
+	hamming_masks = new __m256i [total_lanes];
 #endif
-		[total_lanes];
 	ED_info = new ED_INFO[af_threshold + 1];
 
 	start = new int* [total_lanes];
