@@ -62,55 +62,49 @@ __m256i shift_left_avx(__m256i vec, int shift_num) {
 }
 
 #ifdef USE_AVX512
-static __m512i shift_qwords_up_avx512(__m512i vec, int words) {
-	if (words <= 0)
-		return vec;
-	if (words >= 8)
-		return _mm512_setzero_si512();
-
-	__m512i idx = _mm512_set_epi64(7 - words, 6 - words, 5 - words, 4 - words,
-			3 - words, 2 - words, 1 - words, 0);
-	__mmask8 mask = (uint8_t)(0xffu << words);
-	return _mm512_maskz_permutexvar_epi64(mask, idx, vec);
-}
-
-static __m512i shift_qwords_down_avx512(__m512i vec, int words) {
-	if (words <= 0)
-		return vec;
-	if (words >= 8)
-		return _mm512_setzero_si512();
-
-	__m512i idx = _mm512_set_epi64(7, 6, 5, 4, 3, 2, 1, 0);
-	idx = _mm512_add_epi64(idx, _mm512_set1_epi64(words));
-	__mmask8 mask = (uint8_t)(0xffu >> words);
-	return _mm512_maskz_permutexvar_epi64(mask, idx, vec);
-}
-
 __m512i shift_right_avx512(__m512i vec, int shift_num) {
-	if (shift_num <= 0)
-		return vec;
+	if (shift_num >= 256) {
+		vec = _mm512_maskz_permutexvar_epi64(0xf0,
+				_mm512_set_epi64(3, 2, 1, 0, 0, 0, 0, 0), vec);
+		shift_num = shift_num % 256;
+	}
+	if (shift_num >= 128) {
+		vec = _mm512_maskz_permutexvar_epi64(0xfc,
+				_mm512_set_epi64(5, 4, 3, 2, 1, 0, 0, 0), vec);
+		shift_num = shift_num % 128;
+	}
+	if (shift_num >= 64) {
+		vec = _mm512_maskz_permutexvar_epi64(0xfe,
+				_mm512_set_epi64(6, 5, 4, 3, 2, 1, 0, 0), vec);
+		shift_num = shift_num % 64;
+	}
 
-	vec = shift_qwords_up_avx512(vec, shift_num / 64);
-	shift_num %= 64;
-	if (shift_num == 0)
-		return vec;
-
-	__m512i carryover = shift_qwords_up_avx512(vec, 1);
+	__m512i carryover = _mm512_maskz_permutexvar_epi64(0xfe,
+			_mm512_set_epi64(6, 5, 4, 3, 2, 1, 0, 0), vec);
 	carryover = _mm512_srli_epi64(carryover, 64 - shift_num);
 	vec = _mm512_slli_epi64(vec, shift_num);
 	return _mm512_or_si512(vec, carryover);
 }
 
 __m512i shift_left_avx512(__m512i vec, int shift_num) {
-	if (shift_num <= 0)
-		return vec;
+	if (shift_num >= 256) {
+		vec = _mm512_maskz_permutexvar_epi64(0x0f,
+				_mm512_set_epi64(11, 10, 9, 8, 7, 6, 5, 4), vec);
+		shift_num = shift_num % 256;
+	}
+	if (shift_num >= 128) {
+		vec = _mm512_maskz_permutexvar_epi64(0x3f,
+				_mm512_set_epi64(9, 8, 7, 6, 5, 4, 3, 2), vec);
+		shift_num = shift_num % 128;
+	}
+	if (shift_num >= 64) {
+		vec = _mm512_maskz_permutexvar_epi64(0x7f,
+				_mm512_set_epi64(8, 7, 6, 5, 4, 3, 2, 1), vec);
+		shift_num = shift_num % 64;
+	}
 
-	vec = shift_qwords_down_avx512(vec, shift_num / 64);
-	shift_num %= 64;
-	if (shift_num == 0)
-		return vec;
-
-	__m512i carryover = shift_qwords_down_avx512(vec, 1);
+	__m512i carryover = _mm512_maskz_permutexvar_epi64(0x7f,
+			_mm512_set_epi64(8, 7, 6, 5, 4, 3, 2, 1), vec);
 	carryover = _mm512_slli_epi64(carryover, 64 - shift_num);
 	vec = _mm512_srli_epi64(vec, shift_num);
 	return _mm512_or_si512(vec, carryover);

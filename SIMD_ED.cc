@@ -194,16 +194,14 @@ SIMD_ED::~SIMD_ED() {
 }
 
 void SIMD_ED::convert_reads(char *read, char *ref, int length, uint8_t *A0, uint8_t *A1, uint8_t *B0, uint8_t *B1) {
-	if (length > LEAP_SSE_EFFECTIVE_LENGTH)
-		length = LEAP_SSE_EFFECTIVE_LENGTH;
+	if (length > _MAX_LENGTH_)
+		length = _MAX_LENGTH_;
 
 	//cout << "length: " << length << " ref: " << ref << endl;;
 
-	memset(A, 0, LEAP_SSE_EFFECTIVE_LENGTH);
-	memset(B, 0, LEAP_SSE_EFFECTIVE_LENGTH);
-	memcpy(A, read, length);
+	strncpy(A, read, length);
 	sse_convert2bit(A, A_bit0_t, A_bit1_t);
-	memcpy(B, ref, length);
+	strncpy(B, ref, length);
 	sse_convert2bit(B, B_bit0_t, B_bit1_t);
 
 	memcpy(A0, A_bit0_t, (length - 1) / 8 + 1);
@@ -213,19 +211,17 @@ void SIMD_ED::convert_reads(char *read, char *ref, int length, uint8_t *A0, uint
 }
 
 void SIMD_ED::load_reads(char *read, char *ref, int length) {
-	if (length > LEAP_ACTIVE_EFFECTIVE_LENGTH)
-		length = LEAP_ACTIVE_EFFECTIVE_LENGTH;
 	buffer_length = length;
+	if (length > _MAX_LENGTH_)
+		length = _MAX_LENGTH_;
 
-	memset(A, 0, LEAP_ACTIVE_EFFECTIVE_LENGTH);
-	memset(B, 0, LEAP_ACTIVE_EFFECTIVE_LENGTH);
-	memcpy(A, read, length);
+	strncpy(A, read, length);
 #ifdef USE_AVX512
 	avx512_convert2bit(A, A_bit0_t, A_bit1_t);
 #else
 	avx_convert2bit(A, A_bit0_t, A_bit1_t);
 #endif
-	memcpy(B, ref, length);
+	strncpy(B, ref, length);
 #ifdef USE_AVX512
 	avx512_convert2bit(B, B_bit0_t, B_bit1_t);
 #else
