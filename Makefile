@@ -1,4 +1,4 @@
-EXECUTABLE = popcount bit_convert vectorED testNW testLV testLV_BAG vectorSHD_ED testRefDB# countPassFilter vector_filter string_cp shift test_SIMD_ED vectorED vectorLV sse.o diffED #ssse3_popcount test_modifier
+EXECUTABLE = popcount bit_convert vectorED vectorLEAP testNW testLV testLV_BAG vectorSHD_ED testRefDB# countPassFilter vector_filter string_cp shift test_SIMD_ED vectorED vectorLV sse.o diffED #ssse3_popcount test_modifier
 
 CXX = g++-5
 
@@ -82,6 +82,9 @@ needleman_wunsch.o: $(NW_PATH)/needleman_wunsch.c $(NW_PATH)/needleman_wunsch.h
 	$(CXX) $(CFLAGS) -c $< -o $@
 
 vectorED: SIMD_ED.o print.o bit_convert.o vectorED.cc shift.o SHD.o mask.o popcount.o needleman_wunsch.o $(wildcard $(SCORING_PATH)/*.c) $(UTILITY_LIB_PATH)/utility_lib.c $(BIOINF_LIB_PATH)/bioinf.c $(STRING_BUF_PATH)/string_buffer.c $(NW_PATH)/nw_cmdline.c 
+	$(CXX) $(CFLAGS) $^ -o $@ -lz 
+
+vectorLEAP: SIMD_ED.o print.o bit_convert.o vectorED.cc shift.o SHD.o mask.o popcount.o needleman_wunsch.o $(wildcard $(SCORING_PATH)/*.c) $(UTILITY_LIB_PATH)/utility_lib.c $(BIOINF_LIB_PATH)/bioinf.c $(STRING_BUF_PATH)/string_buffer.c $(NW_PATH)/nw_cmdline.c 
 	$(CXX) $(CFLAGS) $^ -o $@ -lz 
 
 SIMD_ED_avx512.o: SIMD_ED.cc SIMD_ED.h
